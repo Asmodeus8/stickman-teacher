@@ -3,78 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A stickman teacher at a blackboard who points at, circles and works with numbers.">
+  <meta name="theme-color" content="#2f5e4b">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <title>Stickman Teacher</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Gochi+Hand&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <main class="app">
     <header class="top">
       <h1>Stickman Teacher</h1>
       <div class="chips">
-        <span class="chip selected-chip">Selected <strong id="selected-value">–</strong></span>
-        <span class="chip status" id="status">Ready</span>
+        <span class="chip selected-chip" id="selected-chip">Selected <strong id="selected-value">–</strong></span>
+        <span class="chip status" id="status" role="status" aria-live="polite">
+          <span id="status-text">Ready</span>
+          <span class="queued" id="queued" hidden></span>
+        </span>
+        <button class="icon-btn" id="undo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+        </button>
+        <button class="icon-btn danger" id="stop" type="button" title="Stop (Esc)" aria-label="Stop" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+        <button class="icon-btn" id="sound" type="button" title="Sound and voice" aria-label="Sound and voice" aria-pressed="true">
+          <svg class="on" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+          <svg class="off" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>
+        </button>
       </div>
     </header>
 
     <div class="stage-wrap">
-      <canvas id="stage" aria-label="A stickman standing in front of a blackboard with numbers"></canvas>
+      <canvas id="stage" aria-label="A stickman standing in front of a blackboard with numbers. Click numbers to select them."></canvas>
     </div>
 
-    <section class="controls">
-      <div class="group">
-        <h2>Selected number</h2>
-        <div class="buttons">
-          <button data-action="point" title="P">Point</button>
-          <button data-action="circle" title="C">Circle</button>
-          <button data-action="underline" title="U">Underline</button>
-          <button data-action="tick" title="T">Tick</button>
-          <button data-action="cross" title="X">Cross out</button>
-        </div>
-      </div>
+    <div class="controls">
+      <div class="action-groups" id="action-groups"></div>
 
-      <div class="group">
-        <h2>All numbers</h2>
-        <div class="buttons">
-          <button data-action="readAll" title="R">Read all</button>
-          <button data-action="addUp" title="A">Add up</button>
-          <button data-action="biggest">Biggest</button>
-          <button data-action="smallest">Smallest</button>
-          <button data-action="evens">Evens</button>
-        </div>
-      </div>
-
-      <div class="group">
-        <h2>Board</h2>
-        <div class="buttons">
-          <button data-action="clean" title="E">Clean</button>
-          <button data-action="newNumbers" title="N">New numbers</button>
-          <button data-action="wave" title="W">Wave</button>
-        </div>
-      </div>
-
-      <div class="group settings">
+      <section class="group settings">
+        <h2>Write a number</h2>
+        <form class="write" id="write-form">
+          <input id="write-input" type="number" inputmode="numeric" min="0" max="999" placeholder="0 – 999" aria-label="Number to write">
+          <button type="submit">Write</button>
+        </form>
         <h2>Chalk</h2>
-        <div class="swatches">
-          <button class="swatch" data-color="rgba(247, 246, 236, 0.93)" style="--c:#f7f6ec" aria-label="White" aria-pressed="true"></button>
-          <button class="swatch" data-color="#ffe680" style="--c:#ffe680" aria-label="Yellow" aria-pressed="false"></button>
-          <button class="swatch" data-color="#ff9ec7" style="--c:#ff9ec7" aria-label="Pink" aria-pressed="false"></button>
-          <button class="swatch" data-color="#8fd3ff" style="--c:#8fd3ff" aria-label="Blue" aria-pressed="false"></button>
+        <div class="settings-row">
+          <div class="swatches" id="swatches"></div>
+          <label class="speed">
+            <span>Speed <output id="speed-label">1×</output></span>
+            <input id="speed" type="range" min="0.5" max="2.5" step="0.5" value="1">
+          </label>
         </div>
-        <label class="speed">
-          <span>Speed <output id="speed-label">1×</output></span>
-          <input id="speed" type="range" min="0.5" max="2.5" step="0.5" value="1">
-        </label>
-      </div>
-    </section>
+      </section>
+    </div>
   </main>
-
-  <script src="js/engine.js"></script>
-  <script src="js/board.js"></script>
-  <script src="js/stickman.js"></script>
-  <script src="js/actions.js"></script>
-  <script src="js/main.js"></script>
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
