@@ -100,7 +100,15 @@ export class Teacher {
     const a0 = man.bubble.alpha;
     await this.anim.tween(150, t => { man.bubble.alpha = lerp(a0, 1, t); });
     await this.anim.wait(holdMs);
+    await this.untilQuiet();
     await this.hideBubble();
+  }
+
+  async untilQuiet(maxMs = 7000): Promise<void> {
+    const start = performance.now();
+    while (this.voice.speaking && performance.now() - start < maxMs) {
+      await this.anim.wait(100 * this.anim.speed);
+    }
   }
 
   async hideBubble(): Promise<void> {

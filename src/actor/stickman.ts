@@ -60,6 +60,7 @@ export class Stickman {
   gesture: Gesture = 'none';
   gestureAmt = 0;
   look: Vec | null = null;
+  gaze: Vec | null = null;
   talkUntil = 0;
   voiceActive = false;
   bubble = { text: '', alpha: 0 };
@@ -138,6 +139,12 @@ export class Stickman {
     this.lastTip = { x: tip.x, y: tip.y };
   }
 
+  contains(p: Vec): boolean {
+    const pose = this.pose;
+    if (!pose) return false;
+    return Math.abs(p.x - this.x) < 42 && p.y > pose.head.y - BODY.head - 10 && p.y < FOOT_Y + 8;
+  }
+
   get talking(): boolean {
     return this.pose !== null && (this.voiceActive || performance.now() < this.talkUntil) && this.bubble.alpha > 0.05;
   }
@@ -154,9 +161,11 @@ export class Stickman {
 
     inked(c, 6, () => polyline(c, [p.shoulder, p.back.elbow, p.back.hand]));
     inked(c, 6, () => {
-      for (const l of p.legs) polyline(c, [p.hip, l.knee, l.foot, l.toe]);
+      for (const l of p.legs) polyline(c, [p.hip, l.knee, l.foot]);
       polyline(c, [p.hip, p.shoulder, p.neck]);
     });
+    for (const l of p.legs) this.drawSneaker(c, l.foot);
+    this.drawLanyard(c, p);
     this.drawHead(c, p.head, time);
 
     inked(c, 5, () => polyline(c, [p.front.hand, p.tip]), '#8a5a2b');
@@ -178,10 +187,11 @@ export class Stickman {
     c.save();
     c.globalAlpha = b.alpha;
     c.font = BUBBLE_FONT;
-    const bw = c.measureText(b.text).width + 36;
-    const bh = 50;
+    const lines = wrapText(c, b.text, 430);
+    const bw = Math.max(...lines.map(l => c.measureText(l).width)) + 36;
+    const bh = lines.length * 31 + 19;
     const cx = clamp(p.head.x - f * (bw / 2 + 30), bw / 2 + 12, W - bw / 2 - 12);
-    const top = p.head.y - 98;
+    const top = p.head.y - 48 - bh;
 
     c.fillStyle = 'rgba(30, 20, 10, 0.18)';
     roundRectPath(c, cx - bw / 2 + 3, top + 4, bw, bh, 18);
@@ -209,8 +219,45 @@ export class Stickman {
     c.fillStyle = '#222';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillText(b.text, cx, top + bh / 2 + 1);
+    lines.forEach((line, i) => c.fillText(line, cx, top + 26 + i * 31));
     c.restore();
+  }
+
+  private drawSneaker(c: CanvasRenderingContext2D, foot: Vec): void {
+    const f = this.facing;
+    const x = f > 0 ? foot.x - 7 : foot.x - 17;
+    c.fillStyle = HALO;
+    roundRectPath(c, x - 3, foot.y - 11, 30, 15, 7);
+    c.fill();
+    c.fillStyle = '#e0533d';
+    roundRectPath(c, x, foot.y - 8, 24, 10, 5);
+    c.fill();
+    c.fillStyle = '#fbf7ee';
+    c.fillRect(x + 2, foot.y, 20, 2.5);
+    c.fillStyle = '#fbf7ee';
+    c.beginPath();
+    c.arc(f > 0 ? x + 18 : x + 6, foot.y - 4, 2.2, 0, Math.PI * 2);
+    c.fill();
+  }
+
+  private drawLanyard(c: CanvasRenderingContext2D, p: Pose): void {
+    const f = this.facing;
+    const badge = { x: p.shoulder.x + f * 7, y: p.shoulder.y + 34 };
+    c.strokeStyle = '#3b82c4';
+    c.lineWidth = 2.5;
+    c.beginPath();
+    c.moveTo(p.neck.x - 4, p.neck.y + 4);
+    c.lineTo(badge.x, badge.y);
+    c.lineTo(p.neck.x + 5, p.neck.y + 4);
+    c.stroke();
+    c.fillStyle = '#fbf7ee';
+    c.strokeStyle = INK;
+    c.lineWidth = 2;
+    roundRectPath(c, badge.x - 7, badge.y, 14, 17, 2.5);
+    c.fill();
+    c.stroke();
+    c.fillStyle = '#3b82c4';
+    c.fillRect(badge.x - 6, badge.y + 1, 12, 4);
   }
 
   private drawTool(c: CanvasRenderingContext2D, p: Pose): void {
@@ -252,33 +299,49 @@ export class Stickman {
     c.fill();
     c.stroke();
 
-    c.lineWidth = 3;
-    c.beginPath();
-    c.moveTo(h.x - f * 4, h.y - r + 1);
-    c.quadraticCurveTo(h.x + f * 2, h.y - r - 12, h.x + f * 10, h.y - r - 6);
-    c.stroke();
+    this.drawHair(c, h, r);
 
-    let lx = f * 1.5;
+    c.fillStyle = 'rgba(240, 120, 120, 0.4)';
+    c.beginPath();
+    c.ellipse(h.x + f * 17, h.y + 7, 5, 3, 0, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.ellipse(h.x - f * 1, h.y + 7, 4, 2.6, 0, 0, Math.PI * 2);
+    c.fill();
+
+    const target = this.look ?? this.gaze;
+    let lx = f * 1.2;
     let ly = 0;
-    if (this.look) {
-      const a = Math.atan2(this.look.y - h.y, this.look.x - h.x);
-      lx = Math.cos(a) * 2.2;
-      ly = Math.sin(a) * 2.2;
+    if (target) {
+      const a = Math.atan2(target.y - h.y, target.x - h.x);
+      lx = Math.cos(a) * 1.8;
+      ly = Math.sin(a) * 1.8;
     }
     const blink = time % 4200 < 120;
-    c.fillStyle = INK;
-    for (const ex of [f * 5, f * 15]) {
+    for (const ex of [f * 4, f * 15]) {
+      const cx = h.x + ex;
+      const cy = h.y - 2;
       if (blink) {
-        c.fillRect(h.x + ex - 3 + lx, h.y - 4, 6, 2);
-      } else {
-        c.beginPath();
-        c.arc(h.x + ex + lx, h.y - 4 + ly, 2.8, 0, Math.PI * 2);
-        c.fill();
+        c.fillStyle = INK;
+        c.fillRect(cx - 4, cy, 8, 2);
+        continue;
       }
+      c.fillStyle = '#fff';
+      c.beginPath();
+      c.ellipse(cx, cy, 4.6, 5.4, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = INK;
+      c.beginPath();
+      c.arc(cx + lx, cy + ly, 3.3, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#fff';
+      c.beginPath();
+      c.arc(cx + lx + 1.2, cy + ly - 1.3, 1.1, 0, Math.PI * 2);
+      c.fill();
     }
 
     const mx = h.x + f * 10;
-    const my = h.y + 9;
+    const my = h.y + 10;
     c.lineWidth = 2.5;
     if (this.talking) {
       const open = 2 + Math.abs(Math.sin(time / 70)) * 5;
@@ -291,6 +354,46 @@ export class Stickman {
       c.stroke();
     }
   }
+
+  private drawHair(c: CanvasRenderingContext2D, h: Vec, r: number): void {
+    const f = this.facing;
+    const R = r + 3;
+    const start = Math.PI * 1.02;
+    const end = Math.PI * 1.98;
+    const sx = (a: number) => h.x + f * Math.cos(a) * R;
+    const sy = (a: number) => h.y + Math.sin(a) * R;
+    c.fillStyle = '#2b1d16';
+    c.beginPath();
+    c.moveTo(sx(start), sy(start) + 4);
+    for (let i = 0; i <= 12; i++) {
+      const a = start + ((end - start) * i) / 12;
+      const spike = i % 2 ? 7 : 0;
+      c.lineTo(h.x + f * Math.cos(a) * (R + spike), h.y + Math.sin(a) * (R + spike));
+    }
+    const fringe = [
+      [0.98, -0.2], [0.78, -0.48], [0.62, -0.22], [0.42, -0.5], [0.22, -0.3], [0.02, -0.55], [-0.3, -0.42], [-0.7, -0.15],
+    ];
+    for (const [fx, fy] of fringe) c.lineTo(h.x + f * fx * R, h.y + fy * R);
+    c.closePath();
+    c.fill();
+  }
+}
+
+function wrapText(c: CanvasRenderingContext2D, text: string, max: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    if (line && c.measureText(next).width > max) {
+      lines.push(line);
+      line = w;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
 function polyline(c: CanvasRenderingContext2D, pts: Vec[]): void {

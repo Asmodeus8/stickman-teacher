@@ -6,12 +6,12 @@
   <meta name="description" content="A stickman teacher at a blackboard who points at, circles and works with numbers.">
   <meta name="theme-color" content="#2f5e4b">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <title>Stickman Teacher</title>
+  <title>Michael's Class</title>
 </head>
 <body>
   <main class="app">
     <header class="top">
-      <h1>Stickman Teacher</h1>
+      <h1>Michael's Class</h1>
       <div class="chips">
         <span class="chip selected-chip" id="selected-chip">Selected <strong id="selected-value">–</strong></span>
         <span class="chip status" id="status" role="status" aria-live="polite">
@@ -32,7 +32,20 @@
     </header>
 
     <div class="stage-wrap">
-      <canvas id="stage" aria-label="A stickman standing in front of a blackboard with numbers. Click numbers to select them."></canvas>
+      <canvas id="stage" aria-label="Michael, a stickman teacher, in front of a blackboard with numbers. Click numbers to select them."></canvas>
+      <div class="quiz-banner" id="quiz-banner" role="status" aria-live="polite" hidden>
+        <span class="quiz-progress" id="quiz-progress">Quiz</span>
+        <strong class="quiz-prompt" id="quiz-prompt"></strong>
+        <span class="quiz-score" id="quiz-score">★ 0</span>
+        <button class="quiz-end" id="quiz-end" type="button">End quiz</button>
+      </div>
+      <div class="start-overlay" id="start-overlay">
+        <button class="start-btn" id="start-class" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <span>Start class</span>
+        </button>
+        <p>Sound on for Michael's voice</p>
+      </div>
     </div>
 
     <div class="controls">

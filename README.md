@@ -1,6 +1,8 @@
-# Stickman Teacher
+# Michael's Class
 
-A stickman stands in front of a blackboard and teaches with the numbers on it. He points at them, circles, underlines, ticks and crosses them out, compares and adds them, finds the biggest and smallest, sorts the board, and writes new numbers in chalk. He reads his lines aloud while he works.
+**Live:** https://stickman-teacher.vercel.app
+
+Michael is a young stickman teacher at a blackboard. He introduces himself, then teaches with the numbers on the board. He points at them, circles, underlines, ticks and crosses them out, compares and adds them, finds the biggest and smallest, sorts the board, and writes new numbers in chalk. He also quizzes you: he asks a question, you click the answer on the board, and he marks it and keeps score. He reads every line aloud.
 
 Built with **TypeScript + HTML Canvas 2D**. No game engine or drawing library is used: every frame is drawn by hand.
 
@@ -15,6 +17,21 @@ npm run build      # type-check + production build into dist/
 
 ## Using it
 
+- **Start class:** the first click unlocks sound (browsers require it). Michael walks in and introduces himself.
+- **Quiz me (Q):** five questions:
+  - biggest or smallest
+  - even or odd
+  - find a number
+  - closest to a target
+  - which of two is bigger
+
+  Answer by clicking on the board. A wrong answer gets a hint, and a second miss reveals the answer. The final score goes on the board.
+- **He reacts to you:**
+  - his eyes follow your cursor
+  - clicking him gets a reaction
+  - clicking the floor makes him walk there
+  - selecting a number gets a fact about it (prime, square, multiple of 10…)
+  - if you go quiet, he offers a tip
 - **Click numbers** on the board to select them. Click again to deselect, and click empty board to clear. Selection order matters for *Compare*.
 - **Selected numbers:** Point, Circle, Underline, Tick, Cross out, Compare (2), Add these (2+). Actions run on every selected number in turn.
 - **Whole board:** Read all, Add up, Biggest, Smallest, Evens, Sort.
@@ -39,6 +56,10 @@ src/
              stickman.ts  pose model, per-frame update, drawing
   actions/   teacher.ts   movement vocabulary: walk, reach, tap, draw, write, speak
              catalog.ts   every button as one data entry
+             personality.ts  intro, reactions, number facts, idle tips
+  quiz/      questions.ts pure question generator (testable)
+             facts.ts     prime / square / multiple checks
+             session.ts   ask → wait for a click → judge → score
   audio/     sfx.ts       Web Audio synthesis (chalk scratch, steps, taps)
              voice.ts     Web Speech API
   ui/        controls.ts  DOM wiring, selection, shortcuts, undo
@@ -78,7 +99,9 @@ await t.say(`Circled ${n.value}`);
 
 ## Tests
 
-`tests/` covers the logic that doesn't need a browser:
+`tests/` (27 tests) covers the logic that doesn't need a browser:
+- the quiz: across 300 random boards, every question has an answer on the board, the right numbers are marked correct, and question types don't repeat back to back
+- number facts
 - the IK solver: reaches targets, keeps bone lengths, clamps out-of-reach targets, bends to either side
 - the animator: progress, speed, cancellation unwinding an async script
 - the queue: ordering, stop/recover, surviving errors

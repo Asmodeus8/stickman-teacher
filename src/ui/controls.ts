@@ -1,10 +1,12 @@
 import { ACTIONS, writeValue, type ActionDef, type Group } from '../actions/catalog';
+import { comment, introduce, poked, strollTo, tip, tipsLeft } from '../actions/personality';
 import type { Teacher } from '../actions/teacher';
 import type { ActionQueue } from '../core/queue';
 import type { Vec } from '../core/math';
 import type { BoardSnapshot } from '../scene/board';
 import { CHALK_COLORS } from '../scene/chalk';
-import { H, W, hitTest, type BoardNumber } from '../scene/layout';
+import { FLOOR_Y, H, W, hitTest, type BoardNumber } from '../scene/layout';
+import { QuizSession } from '../quiz/session';
 
 const GROUP_TITLES: Record<Group, string> = {
   selected: 'Selected numbers',
@@ -13,11 +15,16 @@ const GROUP_TITLES: Record<Group, string> = {
 };
 
 const HISTORY_LIMIT = 20;
+const IDLE_TIP_MS = 18000;
 
 export class Controls {
   selection: BoardNumber[] = [];
   hover: BoardNumber | null = null;
+  pointer: Vec | null = null;
+  started = false;
+  readonly quiz: QuizSession;
   private history: BoardSnapshot[] = [];
+  private lastInteraction = performance.now();
   private chalk: string = CHALK_COLORS[0].value;
 
   private el = {
@@ -35,6 +42,13 @@ export class Controls {
     writeInput: byId<HTMLInputElement>('write-input'),
     groups: byId('action-groups'),
     swatches: byId('swatches'),
+    overlay: byId('start-overlay'),
+    startBtn: byId<HTMLButtonElement>('start-class'),
+    quizBanner: byId('quiz-banner'),
+    quizProgress: byId('quiz-progress'),
+    quizPrompt: byId('quiz-prompt'),
+    quizScore: byId('quiz-score'),
+    quizEnd: byId<HTMLButtonElement>('quiz-end'),
   };
 
   constructor(
@@ -42,15 +56,65 @@ export class Controls {
     private teacher: Teacher,
     private queue: ActionQueue,
   ) {
+    this.quiz = new QuizSession(teacher, () => this.refresh());
     this.buildButtons();
     this.buildSwatches();
     this.bindCanvas();
     this.bindKeys();
     this.bindSettings();
+    this.bindStart();
     this.refresh();
+    window.setInterval(() => this.idleCheck(), 1000);
+  }
+
+  private bindStart(): void {
+    this.el.startBtn.addEventListener('click', () => {
+      this.teacher.sfx.unlock();
+      this.started = true;
+      this.el.overlay.classList.add('is-hidden');
+      this.touch();
+      this.queue.add('Introducing himself', () => introduce(this.teacher));
+      this.el.startBtn.blur();
+    });
+    this.el.quizEnd.addEventListener('click', () => this.stopAll());
+  }
+
+  private touch(): void {
+    this.lastInteraction = performance.now();
+  }
+
+  private get idle(): boolean {
+    return !this.queue.busy && this.queue.pending.length === 0;
+  }
+
+  private idleCheck(): void {
+    if (!this.started || !this.idle || this.quiz.active || !tipsLeft()) return;
+    if (performance.now() - this.lastInteraction < IDLE_TIP_MS) return;
+    this.touch();
+    this.queue.add('Giving a tip', () => tip(this.teacher));
+  }
+
+  stopAll(): void {
+    this.quiz.end();
+    this.queue.stop();
+  }
+
+  private startQuiz(): void {
+    this.selection = [];
+    this.queue.add('Quiz time', async () => {
+      this.remember();
+      await this.quiz.begin();
+    });
   }
 
   run(def: ActionDef): void {
+    if (!this.started) return;
+    this.touch();
+    if (def.id === 'quiz') {
+      if (!this.quiz.active) this.startQuiz();
+      return;
+    }
+    if (this.quiz.active) this.quiz.end();
     const sel = [...this.selection];
     if (def.needs && sel.length < def.needs) {
       const msg = def.needs === 2 ? 'Pick two numbers first!' : 'Click a number first!';
@@ -66,6 +130,9 @@ export class Controls {
   }
 
   private write(value: number): void {
+    if (!this.started) return;
+    this.touch();
+    if (this.quiz.active) this.quiz.end();
     this.queue.add(`Writing ${value}`, async () => {
       this.remember();
       await writeValue(this.teacher, value);
@@ -104,6 +171,15 @@ export class Controls {
     this.el.selectedChip.classList.toggle('has-value', this.selection.length > 0);
     for (const btn of this.el.groups.querySelectorAll<HTMLButtonElement>('[data-needs]')) {
       btn.classList.toggle('is-ready', this.selection.length >= Number(btn.dataset.needs));
+    }
+
+    const quiz = this.quiz;
+    this.el.quizBanner.hidden = !quiz.active;
+    if (quiz.active) {
+      this.el.quizProgress.textContent = quiz.round ? `Question ${quiz.round} of ${quiz.total}` : 'Quiz';
+      this.el.quizPrompt.textContent = quiz.question ? quiz.question.prompt : 'Get ready…';
+      this.el.quizScore.textContent = `★ ${quiz.score}`;
+      this.el.quizBanner.classList.toggle('is-waiting', quiz.awaiting);
     }
   }
 
@@ -158,17 +234,49 @@ export class Controls {
 
   private bindCanvas(): void {
     this.canvas.addEventListener('pointermove', e => {
-      this.hover = hitTest(this.teacher.board.numbers, this.toWorld(e)) ?? null;
-      this.canvas.style.cursor = this.hover ? 'pointer' : 'default';
+      const p = this.toWorld(e);
+      this.pointer = p;
+      this.hover = hitTest(this.teacher.board.numbers, p) ?? null;
+      const onMan = this.teacher.man.contains(p);
+      const onFloor = p.y > FLOOR_Y + 8;
+      this.canvas.style.cursor = this.started && (this.hover || onMan || onFloor) ? 'pointer' : 'default';
     });
-    this.canvas.addEventListener('pointerleave', () => { this.hover = null; });
-    this.canvas.addEventListener('click', e => {
-      const n = hitTest(this.teacher.board.numbers, this.toWorld(e));
-      if (!n) this.selection = [];
-      else if (this.selection.includes(n)) this.selection = this.selection.filter(s => s !== n);
-      else this.selection = [...this.selection, n];
+    this.canvas.addEventListener('pointerleave', () => {
+      this.hover = null;
+      this.pointer = null;
+    });
+    this.canvas.addEventListener('click', e => this.handleClick(this.toWorld(e)));
+  }
+
+  private handleClick(p: Vec): void {
+    if (!this.started) return;
+    this.touch();
+    const t = this.teacher;
+    const n = hitTest(t.board.numbers, p);
+
+    if (this.quiz.active) {
+      if (n && this.quiz.awaiting) this.queue.add(`Checking ${n.value}`, () => this.quiz.answer(n));
+      return;
+    }
+    if (!n && t.man.contains(p)) {
+      if (this.idle) this.queue.add('Chatting', () => poked(t));
+      return;
+    }
+    if (!n && p.y > FLOOR_Y + 8) {
+      this.selection = [];
       this.refresh();
-    });
+      this.queue.add('Walking over', () => strollTo(t, p.x));
+      return;
+    }
+    if (!n) {
+      this.selection = [];
+    } else if (this.selection.includes(n)) {
+      this.selection = this.selection.filter(s => s !== n);
+    } else {
+      this.selection = [...this.selection, n];
+      if (this.idle) this.queue.add(`Looking at ${n.value}`, () => comment(t, n));
+    }
+    this.refresh();
   }
 
   private bindKeys(): void {
@@ -176,7 +284,7 @@ export class Controls {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT') return;
       if (e.key === 'Escape') {
-        this.queue.stop();
+        this.stopAll();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -191,7 +299,7 @@ export class Controls {
   }
 
   private bindSettings(): void {
-    this.el.stop.addEventListener('click', () => this.queue.stop());
+    this.el.stop.addEventListener('click', () => this.stopAll());
     this.el.undo.addEventListener('click', () => this.undo());
 
     this.el.sound.addEventListener('click', () => {

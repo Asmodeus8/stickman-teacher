@@ -26,7 +26,7 @@ async function point(t: Teacher, n: BoardNumber, speak: boolean): Promise<void> 
   }
 }
 
-async function circle(t: Teacher, n: BoardNumber, color?: string): Promise<void> {
+export async function circle(t: Teacher, n: BoardNumber, color?: string): Promise<void> {
   await t.approach(n);
   const rx = n.w / 2 + 24;
   const ry = n.h / 2 + 18;
@@ -49,7 +49,7 @@ async function underline(t: Teacher, n: BoardNumber): Promise<void> {
   await t.chalkPath(p => ({ x: from + 6 + (to - from - 12) * p, y: y + 9 + Math.sin(p * Math.PI) * 2 }), 450);
 }
 
-async function tick(t: Teacher, n: BoardNumber): Promise<void> {
+export async function tick(t: Teacher, n: BoardNumber): Promise<void> {
   await t.approach(n);
   const x = n.x + n.w / 2 + 16;
   const y = n.y + 4;
@@ -217,6 +217,11 @@ export const ACTIONS: ActionDef[] = [
     },
   },
 
+  {
+    id: 'quiz', label: 'Quiz me', group: 'class', key: 'q',
+    status: () => 'Quiz time',
+    run: async () => {},
+  },
   {
     id: 'clean', label: 'Clean', group: 'class', key: 'e', mutates: true,
     status: () => 'Cleaning the board',

@@ -88,6 +88,7 @@ function render(time: number): void {
 function frame(now: number): void {
   anim.update(now);
   man.voiceActive = voice.speaking;
+  man.gaze = queue.busy ? null : controls?.pointer ?? null;
   man.update(now, board, sfx);
   render(now);
   requestAnimationFrame(frame);
@@ -103,11 +104,8 @@ async function start(): Promise<void> {
   const values = pickValues(8);
   board.numbers = pickSlots(8).map((slot, i) => board.place(values[i], slot));
   board.numbers.forEach(n => board.drawNumberNow(n));
+  man.x = -160;
   requestAnimationFrame(frame);
-  queue.add('Saying hi', async () => {
-    await teacher.walkTo(170);
-    await Promise.all([teacher.gesture('wave', 1500), teacher.say('Hi! Pick a number, then an action.', 1700)]);
-  });
 }
 
 void start();
