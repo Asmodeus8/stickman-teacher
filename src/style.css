@@ -424,7 +424,18 @@ input:focus-visible {
 
 @media (max-width: 640px) {
   .start-btn { font-size: 26px; padding: 12px 22px 12px 16px; }
-  .quiz-banner { top: 6px; gap: 8px; padding: 4px 4px 4px 10px; }
+  .quiz-banner {
+    position: static;
+    transform: none;
+    max-width: none;
+    margin: 0;
+    gap: 8px;
+    padding: 6px 6px 6px 12px;
+    border-radius: 0;
+    border-width: 2px 0 0;
+    box-shadow: none;
+  }
+  .quiz-score { margin-left: auto; }
   .quiz-progress { display: none; }
   .quiz-prompt { font-size: 17px; }
 }
